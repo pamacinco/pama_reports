@@ -1,15 +1,9 @@
-description 'Sistema de reportes con los en discord'
+server_script "server.lua"
 
-version '1.0.0'
-
-client_script {
-
-  'client.lua'
+shared_scripts {
+    '@es_extended/locale.lua',
+    'locale.lua',
+    'config.lua'
 }
 
-server_scripts {
-
-  '@mysql-async/lib/MySQL.lua',
-  'server.lua'
-
-}
+dependency "es_extended"

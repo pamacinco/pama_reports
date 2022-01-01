@@ -1,103 +1,77 @@
---[[
+ESX = nil
 
-  Made with love by Cheleber, you can join my RP Server here: www.grandtheftlusitan.com
-  Works with essentialmode, es_admin and esx_identity!
+TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
 
---]]
+local onTimer       = {}
+local savedCoords   = {}
+local warnedPlayers = {}
+local deadPlayers   = {}
 
-function getIdentity(source)
-	local identifier = GetPlayerIdentifiers(source)[1]
-	local result = MySQL.Sync.fetchAll("SELECT * FROM users WHERE identifier = @identifier", {['@identifier'] = identifier})
-	if result[1] ~= nil then
-		local identity = result[1]
 
-		return {
-			identifier = identity['identifier'],
-			name = identity['name'],
-			firstname = identity['firstname'],
-			lastname = identity['lastname'],
-			dateofbirth = identity['dateofbirth'],
-			sex = identity['sex'],
-			height = identity['height'],
-			job = identity['job'],
-			group = identity['group']
-		}
-	else
-		return nil
+RegisterCommand("reportar", function(source, args, rawCommand)
+    local xPlayer = ESX.GetPlayerFromId(source)
+  if onTimer[source] and onTimer[source] > GetGameTimer() then
+      local timeLeft = (onTimer[source] - GetGameTimer()) / 1000
+      TriggerServerEvent('pama_reports:reportar')
+      TriggerClientEvent('chatMessage', xPlayer.source, _U('report_cooldown', tostring(ESX.Math.Round(timeLeft))))
+      return
+  end
+  if args[1] then
+      local message = string.sub(rawCommand, 8)
+      local xAll = ESX.GetPlayers()
+      for i=1, #xAll, 1 do
+            local xTarget = ESX.GetPlayerFromId(xAll[i])
+            if havePermission(xTarget) then		
+              if xPlayer.source ~= xTarget.source then
+                  TriggerClientEvent('chatMessage', xTarget.source, _U('report', xPlayer.source, message))
+              end
+            end
+      end
+      TriggerClientEvent('chatMessage', xPlayer.source, _U('report', xPlayer.source, message))
+      onTimer[source] = GetGameTimer() + (Config.reportCooldown * 1000)
+  else
+      TriggerClientEvent('chatMessage', xPlayer.source, _U('invalid_input', 'REPORT'))
+  end
+end, false)
+
+
+
+function havePermission(xPlayer, exclude)	
+	if exclude and type(exclude) ~= 'table' then exclude = nil;print("^3[Reportes] ^1ERROR ^0exclude argument is not table..^0") end
+
+	local playerGroup = xPlayer.getGroup()
+	for k,v in pairs(Config.adminRanks) do
+		if v == playerGroup then
+			if not exclude then
+				return true
+			else
+				for a,b in pairs(exclude) do
+					if b == v then
+						return false
+					end
+				end
+				return true
+			end
+		end
 	end
+	return false
 end
 
 
-function loadExistingPlayers()
-	TriggerEvent("es:getPlayers", function(curPlayers)
-		for k,v in pairs(curPlayers)do
-			TriggerClientEvent("reply:setGroup", v.get('source'), v.get('group'))
-		end
-	end)
-end
-
-loadExistingPlayers()
-
-AddEventHandler('es:playerLoaded', function(Source, user)
-	TriggerClientEvent('reply:setGroup', Source, user.getGroup())
+RegisterServerEvent('pama_admin:reportar')
+AddEventHandler('pama_admin:reportar', function()
+    print('Log mandado')
+	local _source = source
+		local connect = {
+			{
+				["color"] = "16753920",
+				["title"] = 'Moderador: '.. '['..GetPlayerName(_source).. ']',
+				["description"] = 'Abre el menu Moderador',
+				["footer"] = {
+				["text"] = os.date('%H:%M - %d. %m. %Y', os.time()),
+				["icon_url"] = "",
+				},
+			}
+		}
+	PerformHttpRequest(Config.webhook, function(err, text, headers) end, 'POST', json.encode({username = "Me gusta tu abuela", embeds = connect, avatar_url = 'https://i.ibb.co/nPm4bLq/Logo-Tienda-Prueba.gif'}), { ['Content-Type'] = 'application/json' })
 end)
-
-AddEventHandler('chatMessage', function(source, color, msg)
-	cm = stringsplit(msg, " ")
-	if cm[1] == "/reply" or cm[1] == "/r" then
-		CancelEvent()
-		if tablelength(cm) > 1 then
-			local tPID = tonumber(cm[2])
-			local names2 = GetPlayerName(tPID)
-			local names3 = GetPlayerName(source)
-			local textmsg = ""
-			for i=1, #cm do
-				if i ~= 1 and i ~=2 then
-					textmsg = (textmsg .. " " .. tostring(cm[i]))
-				end
-			end
-			local grupos = getIdentity(source)
-		    if grupos.group ~= 'user' then
-			    TriggerClientEvent('textmsg', tPID, source, textmsg, names2, names3)
-			    TriggerClientEvent('textsent', source, tPID, names2)
-		    else
-			    TriggerClientEvent('chatMessage', source, "SYSTEM", {255, 0, 0}, "Insuficient Premissions!")
-			end
-		end
-	end	
-	
-	if cm[1] == "/report" then
-		CancelEvent()
-		if tablelength(cm) > 1 then
-			local names1 = GetPlayerName(source)
-			local textmsg = ""
-			for i=1, #cm do
-				if i ~= 1 then
-					textmsg = (textmsg .. " " .. tostring(cm[i]))
-				end
-			end
-		    TriggerClientEvent("sendReport", -1, source, names1, textmsg)
-		end
-	end	
-end)
-
-
-function stringsplit(inputstr, sep)
-    if sep == nil then
-        sep = "%s"
-    end
-    local t={} ; i=1
-    for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
-        t[i] = str
-        i = i + 1
-    end
-    return t
-end
-
-
-
-function tablelength(T)
-	local count = 0
-	for _ in pairs(T) do count = count + 1 end
-	return count
-end
