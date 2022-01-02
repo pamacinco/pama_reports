@@ -1,19 +1,20 @@
 ESX = nil
+local _CreateThread, _RegisterServerEvent = CreateThread, RegisterServerEvent
 
 TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
 
+if Config.OLDESX then 
+    ESX = nil
+    TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
+end
+
 local onTimer       = {}
-local savedCoords   = {}
-local warnedPlayers = {}
-local deadPlayers   = {}
 
-
-RegisterCommand("reportar", function(source, args, rawCommand)
+RegisterCommand("report", function(source, args, rawCommand)    -- /report [MESSAGE]        send report message to all online admins
     local xPlayer = ESX.GetPlayerFromId(source)
   if onTimer[source] and onTimer[source] > GetGameTimer() then
       local timeLeft = (onTimer[source] - GetGameTimer()) / 1000
-      TriggerServerEvent('pama_reports:reportar')
-      TriggerClientEvent('chatMessage', xPlayer.source, _U('report_cooldown', tostring(ESX.Math.Round(timeLeft))))
+      xPlayer.triggerEvent('chatMessage', _U('report_cooldown', tostring(ESX.Math.Round(timeLeft))))
       return
   end
   if args[1] then
@@ -21,20 +22,32 @@ RegisterCommand("reportar", function(source, args, rawCommand)
       local xAll = ESX.GetPlayers()
       for i=1, #xAll, 1 do
             local xTarget = ESX.GetPlayerFromId(xAll[i])
-            if havePermission(xTarget) then		
-              if xPlayer.source ~= xTarget.source then
-                  TriggerClientEvent('chatMessage', xTarget.source, _U('report', xPlayer.source, message))
+            if havePermission(xTarget) then        -- you can exclude some ranks to NOT reciveing reports
+              if xPlayer.playerId ~= xTarget.playerId then
+                  xTarget.triggerEvent('chatMessage', _U('report', GetPlayerName(source), xPlayer.playerId, message))
               end
             end
-      end
-      TriggerClientEvent('chatMessage', xPlayer.source, _U('report', xPlayer.source, message))
+      end  -- LOGS DISCORD --
+              local logs = ""
+              local communityname = "Logs"
+              local communtiylogo = "" --Must end with .png or .jpg
+              local connect = {
+              {
+              ["color"] = "16711680",
+              ["title"] = "Reportes",
+              ["description"] = "Jugador: **"..GetPlayerName(source).."**\nID: **"..xPlayer.playerId.."**\n Msg: **"..message.."**",
+              ["footer"] = {
+              ["text"] = communityname,
+              ["icon_url"] = communtiylogo,
+              },
+              }}
+              PerformHttpRequest(Config.webhook, function(err, text, headers) end, 'POST', json.encode({username = "Reportes", embeds = connect}), { ['Content-Type'] = 'application/json' })
+      xPlayer.triggerEvent('chatMessage', _U('report', GetPlayerName(source), xPlayer.playerId, message))
       onTimer[source] = GetGameTimer() + (Config.reportCooldown * 1000)
   else
-      TriggerClientEvent('chatMessage', xPlayer.source, _U('invalid_input', 'REPORT'))
+      xPlayer.triggerEvent('chatMessage', _U('invalid_input', 'REPORT'))
   end
 end, false)
-
-
 
 function havePermission(xPlayer, exclude)	
 	if exclude and type(exclude) ~= 'table' then exclude = nil;print("^3[Reportes] ^1ERROR ^0exclude argument is not table..^0") end
@@ -57,21 +70,24 @@ function havePermission(xPlayer, exclude)
 	return false
 end
 
+_CreateThread(function()
+    local name = "[^4pama_reports^7]"
+    checkVersion = function(error, latestVersion, headers)
+        local currentVersion = Config.scriptVersion            
+        
+        if tonumber(currentVersion) < tonumber(latestVersion) then
+            print(name .. " ^1esta desactualizado.\nTu versión: ^8" .. currentVersion .. "\nVersión nueva: ^2" .. latestVersion .. "\n^3Actualiza^7: https://github.com/pamacinco/pama_reports")
+        elseif tonumber(currentVersion) > tonumber(latestVersion) then
+            print(name .. " te saltaste una version ^2" .. latestVersion .. ". o github esta offline o cambiaste el archivo de versions.")
+        else
+            print(name .. " esta en la version correspondiente.")
+            print(name.. [[
+                Versión: 1.0
+                - Se añadieron los logs en discord
+                - Se optimizo el script
+            ]])
+        end
+    end
 
-RegisterServerEvent('pama_admin:reportar')
-AddEventHandler('pama_admin:reportar', function()
-    print('Log mandado')
-	local _source = source
-		local connect = {
-			{
-				["color"] = "16753920",
-				["title"] = 'Moderador: '.. '['..GetPlayerName(_source).. ']',
-				["description"] = 'Abre el menu Moderador',
-				["footer"] = {
-				["text"] = os.date('%H:%M - %d. %m. %Y', os.time()),
-				["icon_url"] = "",
-				},
-			}
-		}
-	PerformHttpRequest(Config.webhook, function(err, text, headers) end, 'POST', json.encode({username = "Me gusta tu abuela", embeds = connect, avatar_url = 'https://i.ibb.co/nPm4bLq/Logo-Tienda-Prueba.gif'}), { ['Content-Type'] = 'application/json' })
+    PerformHttpRequest("https://raw.githubusercontent.com/pamacinco/versions/master/report_version.txt", checkVersion, "GET")
 end)
