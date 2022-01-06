@@ -1,6 +1,7 @@
 # pama_reports
 Sistema de reportes para fivem con un log en discord.
 
+[Mi Discord](https://discord.gg/FC6fkmrpuZ)
 
 Preview: https://www.youtube.com/watch?v=GIfiqBll5AY
 
